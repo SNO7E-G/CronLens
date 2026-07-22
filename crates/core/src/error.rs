@@ -33,6 +33,11 @@ pub enum CronError {
     #[error("unknown nickname: {0}")]
     UnknownNickname(String),
 
+    /// A recognized but non-time-based schedule (e.g. `@reboot`) that has no
+    /// calculable next run. The payload is a ready-to-print human explanation.
+    #[error("{0}")]
+    Unschedulable(String),
+
     /// A single field failed to parse or validate.
     #[error("{field} field {}: {kind}", .token.as_str())]
     Field {
