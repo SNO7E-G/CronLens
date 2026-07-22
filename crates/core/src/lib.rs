@@ -32,6 +32,12 @@ pub use ast::{CronExpr, Dialect, Field, FieldKind, Term};
 pub use describe::{describe, describe_with, DescribeOptions};
 pub use error::{CronError, FieldError, Result};
 pub use parser::{parse, parse_with, ParseOptions};
+pub use schedule::{next_runs, DstStatus, Run, RunIterator};
+
+// Re-export the date/time crates so downstream code (the CLI, tests, other
+// consumers) uses exactly the versions the engine was built against.
+pub use chrono;
+pub use chrono_tz;
 
 /// The crate version, from `Cargo.toml`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
