@@ -1,0 +1,33 @@
+# cronlens — a lens on your cron.
+# Workspace root. The `core` crate is pure and I/O-free; `cli` is a thin shell.
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/SNO7E-G/CronLens"
+homepage = "https://github.com/SNO7E-G/CronLens"
+authors = ["Mahmoud Ashraf"]
+keywords = ["cron", "crontab", "schedule", "cli", "devops"]
+categories = ["command-line-utilities", "date-and-time"]
+
+[workspace.dependencies]
+cronlens-core = { path = "crates/core", version = "0.1.0" }
+thiserror = "2"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+chrono-tz = "0.10"
+clap = { version = "4", features = ["derive", "wrap_help"] }
+anstream = "0.6"
+anstyle = "1"
+insta = { version = "1", features = ["yaml"] }
+
+# Release profile tuned for a small, fast single binary.
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

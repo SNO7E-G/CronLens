@@ -19,12 +19,17 @@ node_modules/
 !.yarn/versions
 
 # --- Build output ---
+# Rust build artifacts.
+target/
+# Cargo.lock IS committed — this workspace ships a binary.
 dist/
 build/
 out/
 *.tsbuildinfo
 coverage/
 .nyc_output/
+# Rust profiling / coverage.
+*.profraw
 
 # --- Package manager ---
 npm-debug.log*

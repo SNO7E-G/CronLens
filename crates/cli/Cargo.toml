@@ -1,0 +1,23 @@
+[package]
+name = "cronlens-cli"
+description = "cronlens — cron for humans, with a safety net. Translate, schedule, and lint cron expressions from the terminal."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+# The published binary is simply `cronlens`.
+[[bin]]
+name = "cronlens"
+path = "src/main.rs"
+
+[dependencies]
+cronlens-core.workspace = true
+clap.workspace = true
+anstream.workspace = true
+anstyle.workspace = true
