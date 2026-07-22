@@ -3,7 +3,7 @@
 //! The parser auto-detects the dialect from field count and token shape unless
 //! one is pinned via [`ParseOptions::dialect`]. It resolves nicknames
 //! (`@daily`, …), name aliases (`JAN`, `MON`), and the Quartz/AWS extension
-//! tokens (`? L W #`), producing precise [`CronError`]s with the offending
+//! tokens (`? L W #`), producing precise [`CronError`](crate::CronError)s with the offending
 //! token and its span on failure.
 
 use crate::ast::{CronExpr, Dialect};

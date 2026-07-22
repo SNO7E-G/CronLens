@@ -1,6 +1,6 @@
 //! The dialect-independent abstract syntax tree for a cron schedule.
 //!
-//! Every part of the engine — [`crate::parser`], [`crate::describe`],
+//! Every part of the engine — [`crate::parser`], [`describe`](mod@crate::describe),
 //! [`crate::schedule`], [`crate::analyze`] and [`crate::convert`] — operates on
 //! this single representation. Parsers translate a concrete dialect (POSIX,
 //! Quartz, AWS, …) into a [`CronExpr`]; everything downstream stays
@@ -42,7 +42,11 @@ impl Span {
 ///
 /// Dialects differ in field count, the meaning of the sixth/seventh field,
 /// day-of-week numbering, and which special tokens (`? L W #`) are legal.
+///
+/// Marked `#[non_exhaustive]`: more input dialects will be added over time, so
+/// downstream matches must include a wildcard arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Dialect {
     /// Classic Vixie/POSIX 5-field crontab. The default.
     Posix,
@@ -59,6 +63,10 @@ pub enum Dialect {
     GithubActions,
     /// A 6-field expression with a leading **seconds** field (no year).
     UnixSeconds,
+    /// systemd `OnCalendar` timers. A distinct grammar; parsing lands in a later
+    /// phase, but the variant exists so the public surface does not break when
+    /// it arrives.
+    Systemd,
 }
 
 impl Dialect {
@@ -76,6 +84,7 @@ impl Dialect {
             Dialect::Kubernetes => "Kubernetes CronJob",
             Dialect::GithubActions => "GitHub Actions",
             Dialect::UnixSeconds => "Unix (with seconds)",
+            Dialect::Systemd => "systemd OnCalendar",
         }
     }
 }
@@ -88,6 +97,10 @@ impl fmt::Display for Dialect {
 
 /// Which position a [`Field`] occupies. Carries the inclusive value bounds and
 /// the naming scheme for that position.
+///
+/// `FieldKind` is deliberately **exhaustive** (no `#[non_exhaustive]`): the field
+/// positions are fixed by cron itself, and a scheduler that fails to handle one
+/// should be a compile error, not a silent fall-through.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FieldKind {
     Second,
@@ -95,6 +108,11 @@ pub enum FieldKind {
     Hour,
     DayOfMonth,
     Month,
+    /// Day of week. **AST values are always normalized to Vixie numbering**:
+    /// `0..=7` where both `0` and `7` mean Sunday. Dialects that number days
+    /// differently (Quartz/AWS use `1..=7` with `1` = Sunday) must be renumbered
+    /// into this scheme by their parser and back out by the converter, so that a
+    /// `Term::Single(1)` means the same day everywhere downstream.
     DayOfWeek,
     Year,
 }
@@ -254,7 +272,13 @@ impl Term {
 
 /// One parsed field of a cron expression: the union of its [`Term`]s plus the
 /// original text for diagnostics and lossless round-tripping.
+///
+/// Equality is **structural plus textual**: two fields are equal only if their
+/// `raw`/`span` also match, so `1` and `MON` compare unequal even when they mean
+/// the same day. Semantic comparison (for the duplicate-schedule lint) will use
+/// a separate canonical form, not `==`. Construct via [`Field::new`].
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Field {
     pub kind: FieldKind,
     pub terms: Vec<Term>,
@@ -280,10 +304,29 @@ impl Field {
         self
     }
 
-    /// A field is *restricted* when it constrains the schedule — i.e. it is not
-    /// a bare `*` or `?`. This is the predicate the day-field OR-trap turns on.
+    /// A field is *restricted* when it genuinely narrows the schedule. A field
+    /// is unrestricted if **any** of its terms is a wildcard, because the union
+    /// then covers the whole range — e.g. `*,5` matches every value, so it is
+    /// not restricted. Used by the describer to decide which clauses to emit.
     pub fn is_restricted(&self) -> bool {
-        !self.terms.iter().all(Term::is_wildcard)
+        !self.terms.iter().any(Term::is_wildcard)
+    }
+
+    /// Whether the field is "star-prefixed" in Vixie's sense: its first term is
+    /// `*`, `?`, or `*/n`. This — not [`Field::is_restricted`] — is the flag the
+    /// day-of-month / day-of-week OR-trap turns on, matching real Vixie cron,
+    /// which keys the OR behavior on a leading `*` rather than on whether the
+    /// field ultimately constrains anything.
+    pub fn is_star_prefixed(&self) -> bool {
+        matches!(
+            self.terms.first(),
+            Some(Term::All)
+                | Some(Term::NoSpecific)
+                | Some(Term::Step {
+                    base: StepBase::Whole,
+                    ..
+                })
+        )
     }
 
     /// Whether any term uses a Quartz/AWS extension token.
@@ -297,6 +340,7 @@ impl Field {
 /// Optional fields ([`CronExpr::second`], [`CronExpr::year`]) are `None` for
 /// plain 5-field POSIX expressions and `Some` for the wider dialects.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct CronExpr {
     pub dialect: Dialect,
     pub second: Option<Field>,
@@ -311,13 +355,18 @@ pub struct CronExpr {
 }
 
 impl CronExpr {
-    /// The classic cron gotcha, encoded once: when **both** day fields are
-    /// restricted, a date fires if it matches day-of-month **OR** day-of-week.
-    /// When only one is restricted, that field alone decides (the other is
-    /// `*`/`?`). This is what [`crate::schedule`] must honor and what the
-    /// OR-trap lint reports.
+    /// The classic cron gotcha, encoded once: when **neither** day field is
+    /// star-prefixed (Vixie keys this on a leading `*`, see
+    /// [`Field::is_star_prefixed`]), a date fires if it matches day-of-month
+    /// **OR** day-of-week. When either field is star-prefixed, that field is
+    /// treated as "any" and the other alone decides. This is what
+    /// [`crate::schedule`] must honor and what the OR-trap lint reports.
+    ///
+    /// Note this keys on star-prefix, not [`Field::is_restricted`]: real Vixie
+    /// cron gives `*/2` in a day field the "any" treatment even though it
+    /// technically constrains the days.
     pub fn day_fields_are_or(&self) -> bool {
-        self.day_of_month.is_restricted() && self.day_of_week.is_restricted()
+        !self.day_of_month.is_star_prefixed() && !self.day_of_week.is_star_prefixed()
     }
 
     /// Iterate the present fields in canonical order (seconds → year), skipping

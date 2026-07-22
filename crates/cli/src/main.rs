@@ -107,8 +107,8 @@ fn run_translate(expr: &str, cli: &Cli) -> Result<(), u8> {
         Ok(parsed) => parsed,
         // `@reboot` and friends are valid input with no schedule to translate:
         // print the explanation and exit cleanly rather than as an error.
-        Err(cronlens_core::CronError::Unschedulable(msg)) => {
-            println!("{msg}");
+        Err(err @ cronlens_core::CronError::Unschedulable { .. }) => {
+            println!("{err}");
             return Ok(());
         }
         Err(err) => {
