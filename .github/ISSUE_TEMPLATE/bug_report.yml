@@ -1,0 +1,51 @@
+name: Bug report
+description: Report incorrect output or a crash. Reduced cases are gold.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Correctness is the product, so precise cron bug reports are hugely
+        valuable. Please include the expression, dialect, and timezone.
+  - type: input
+    id: expression
+    attributes:
+      label: Cron expression
+      placeholder: "30 2 * * *"
+    validations:
+      required: true
+  - type: dropdown
+    id: dialect
+    attributes:
+      label: Dialect
+      options:
+        - auto-detected
+        - POSIX
+        - Quartz
+        - AWS EventBridge
+        - Kubernetes
+        - GitHub Actions
+    validations:
+      required: true
+  - type: input
+    id: timezone
+    attributes:
+      label: Timezone (IANA)
+      placeholder: "America/New_York"
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead (include the exact command and output)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: cronlens version
+      placeholder: "cronlens --version"
