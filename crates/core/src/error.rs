@@ -112,7 +112,10 @@ pub enum FieldError {
     UnknownName(String),
 
     #[error("'{token}' is not allowed in the {field} field")]
-    NotAllowedHere { token: &'static str, field: FieldKind },
+    NotAllowedHere {
+        token: &'static str,
+        field: FieldKind,
+    },
 
     #[error("'{token}' requires the {dialect} dialect")]
     RequiresDialect {

@@ -10,9 +10,10 @@ const RED: Style = Style::new()
 const DIM: Style = Style::new().dimmed();
 
 /// Print a parse error to stderr, underlining the offending token when the
-/// error carries a span.
+/// error carries a span. Routed through `anstream`, so color is stripped
+/// automatically when stderr is not a TTY and when `NO_COLOR` is set.
 pub fn print_parse_error(source: &str, err: &CronError) {
-    eprintln!("{RED}✗ invalid cron expression{RED:#}: {err}");
+    anstream::eprintln!("{RED}✗ invalid cron expression{RED:#}: {err}");
 
     if let Some(span) = err.span() {
         // Cron tokens are ASCII, so byte offsets line up with columns.
@@ -21,7 +22,7 @@ pub fn print_parse_error(source: &str, err: &CronError) {
         let indent = " ".repeat(start);
         let width = end.saturating_sub(start).max(1);
         let carets = "^".repeat(width);
-        eprintln!("  {DIM}{source}{DIM:#}");
-        eprintln!("  {indent}{RED}{carets}{RED:#}");
+        anstream::eprintln!("  {DIM}{source}{DIM:#}");
+        anstream::eprintln!("  {indent}{RED}{carets}{RED:#}");
     }
 }
