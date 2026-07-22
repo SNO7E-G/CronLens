@@ -10,6 +10,7 @@ use cronlens_core::ast::Dialect;
 use cronlens_core::describe::DescribeOptions;
 use cronlens_core::parser::ParseOptions;
 
+mod clock;
 mod render;
 
 /// Exit codes, chosen so `cronlens` composes in CI.
@@ -47,9 +48,26 @@ struct Cli {
     #[arg(short, long, value_enum)]
     dialect: Option<DialectArg>,
 
-    /// Use a 24-hour clock in descriptions.
+    /// Use a 24-hour clock in descriptions and the run list.
     #[arg(long)]
     use_24h: bool,
+
+    /// Number of upcoming runs to list (0 shows only the translation).
+    #[arg(short = 'n', long, default_value_t = 5)]
+    next: usize,
+
+    /// Target IANA timezone for the run list (default: the system zone).
+    #[arg(long, value_name = "IANA")]
+    tz: Option<String>,
+
+    /// Shortcut for --tz UTC.
+    #[arg(long)]
+    utc: bool,
+
+    /// Compute runs from this local datetime instead of now
+    /// (e.g. 2026-07-22 or "2026-07-22 14:30").
+    #[arg(long, value_name = "DATETIME")]
+    from: Option<String>,
 
     /// Force-disable colored output (also honors NO_COLOR).
     #[arg(long, global = true)]
@@ -125,5 +143,25 @@ fn run_translate(expr: &str, cli: &Cli) -> Result<(), u8> {
 
     let text = cronlens_core::describe_with(&parsed, &describe_opts);
     println!("{text}");
+
+    if cli.next > 0 {
+        let tz = match clock::resolve_tz(cli.tz.as_deref(), cli.utc) {
+            Ok(tz) => tz,
+            Err(msg) => {
+                eprintln!("{msg}");
+                return Err(exit::ERROR);
+            }
+        };
+        let anchor = match clock::resolve_anchor(cli.from.as_deref(), tz) {
+            Ok(anchor) => anchor,
+            Err(msg) => {
+                eprintln!("{msg}");
+                return Err(exit::ERROR);
+            }
+        };
+        let runs = cronlens_core::next_runs(&parsed, anchor, cli.next);
+        render::print_runs(&runs, tz, cli.use_24h, parsed.second.is_some());
+    }
+
     Ok(())
 }

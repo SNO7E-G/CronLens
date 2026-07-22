@@ -115,3 +115,21 @@ fn reboot_is_unschedulable() {
         Err(CronError::Unschedulable { .. })
     ));
 }
+
+#[test]
+fn multiple_field_errors_are_collected() {
+    // Both the minute and the hour are out of range — report both at once.
+    match parse("60 25 * * *").unwrap_err() {
+        CronError::Multiple(errs) => {
+            assert_eq!(errs.len(), 2);
+            assert!(errs.iter().all(|e| matches!(
+                e,
+                CronError::Field {
+                    kind: FieldError::OutOfRange { .. },
+                    ..
+                }
+            )));
+        }
+        other => panic!("expected Multiple, got {other:?}"),
+    }
+}

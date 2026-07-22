@@ -226,9 +226,20 @@ fn build_expr(
 ) -> Result<CronExpr> {
     let (dialect, kinds) = resolve_layout(pinned, tokens.len())?;
 
+    // Collect every field error, not just the first, so validation can report
+    // all of a line's problems at once (SPEC §4.4).
     let mut fields = Vec::with_capacity(kinds.len());
+    let mut errors = Vec::new();
     for (&kind, &(raw, span)) in kinds.iter().zip(tokens.iter()) {
-        fields.push(parse_field_token(raw, span, kind)?);
+        match parse_field_token(raw, span, kind) {
+            Ok(field) => fields.push(field),
+            Err(err) => errors.push(err),
+        }
+    }
+    match errors.len() {
+        0 => {}
+        1 => return Err(errors.pop().expect("len == 1")),
+        _ => return Err(CronError::Multiple(errors)),
     }
 
     let mut iter = fields.into_iter();

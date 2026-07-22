@@ -358,13 +358,15 @@ impl CronExpr {
     /// The classic cron gotcha, encoded once: when **neither** day field is
     /// star-prefixed (Vixie keys this on a leading `*`, see
     /// [`Field::is_star_prefixed`]), a date fires if it matches day-of-month
-    /// **OR** day-of-week. When either field is star-prefixed, that field is
-    /// treated as "any" and the other alone decides. This is what
-    /// [`crate::schedule`] must honor and what the OR-trap lint reports.
+    /// **OR** day-of-week. When **either** field is star-prefixed the two are
+    /// AND-ed instead — each field still constrains (a bare `*` constrains
+    /// nothing, but a star-prefixed `*/2` still restricts to every other day).
+    /// This is what [`crate::schedule`] must honor and what the OR-trap lint
+    /// reports.
     ///
-    /// Note this keys on star-prefix, not [`Field::is_restricted`]: real Vixie
-    /// cron gives `*/2` in a day field the "any" treatment even though it
-    /// technically constrains the days.
+    /// It keys on star-prefix, not [`Field::is_restricted`]: real Vixie cron
+    /// switches to AND on a leading `*` even for `*/2`, which still limits the
+    /// days on which the job fires.
     pub fn day_fields_are_or(&self) -> bool {
         !self.day_of_month.is_star_prefixed() && !self.day_of_week.is_star_prefixed()
     }

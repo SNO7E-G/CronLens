@@ -21,3 +21,4 @@ cronlens-core.workspace = true
 clap.workspace = true
 anstream.workspace = true
 anstyle.workspace = true
+iana-time-zone.workspace = true

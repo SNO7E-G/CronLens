@@ -5,7 +5,7 @@ resolver = "2"
 members = ["crates/core", "crates/cli"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/SNO7E-G/CronLens"
@@ -15,7 +15,7 @@ keywords = ["cron", "crontab", "schedule", "cli", "devops"]
 categories = ["command-line-utilities", "date-and-time"]
 
 [workspace.dependencies]
-cronlens-core = { path = "crates/core", version = "0.1.0" }
+cronlens-core = { path = "crates/core", version = "0.2.0" }
 thiserror = "2"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 chrono-tz = "0.10"
@@ -25,6 +25,7 @@ anstyle = "1"
 insta = { version = "1", features = ["yaml"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+iana-time-zone = "0.1"
 
 # Release profile tuned for a small, fast single binary.
 [profile.release]

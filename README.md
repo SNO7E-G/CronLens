@@ -86,16 +86,28 @@ v1.0.
 ## Usage
 
 ```console
-# Translate (the default)
-cronlens "*/15 9-17 * * 1-5"
-cronlens --verbose "0 0 1 * *"          # field-by-field breakdown
+# Translate + the next runs (the default)
+$ cronlens "0 9 * * 1-5" --tz America/New_York --next 4
+At 9:00 AM, Monday through Friday.
 
-# Pin a dialect instead of auto-detecting
-cronlens --dialect quartz "0 0 12 * * ?"
+Next 4 runs (America/New_York):
+   1. Thu 2026-07-23 09:00 AM EDT
+   2. Fri 2026-07-24 09:00 AM EDT
+   3. Mon 2026-07-27 09:00 AM EDT
+   4. Tue 2026-07-28 09:00 AM EDT
 ```
 
-More commands — `next`, `check`, `lint`, `convert`, `diff`, `gen` — arrive with
-the releases below.
+```console
+cronlens --verbose "0 0 1 * *"           # field-by-field breakdown
+cronlens "*/15 * * * *" --utc            # runs in UTC
+cronlens "0 3 * * *" --from 2026-03-01   # anchor the run list at a date
+cronlens --dialect quartz "0 0 12 * * ?" # pin a dialect
+cronlens "0 9 * * 1-5" --next 0          # translation only, no run list
+```
+
+Timezone/DST math is correct across transitions, and invalid input is reported
+per field with a non-zero exit code, so `cronlens` works as a CI gate. More
+commands — `lint`, `convert`, `diff`, `gen` — arrive with the releases below.
 
 ## Roadmap
 
@@ -103,8 +115,8 @@ cronlens ships in small, well-tested increments. Each phase is a release.
 
 | Release | Theme          | Highlights                                                        |
 | ------- | -------------- | ----------------------------------------------------------------- |
-| v0.1    | Translate      | POSIX parser, nicknames, plain-English `describe`, golden tests   |
-| v0.2    | Timing         | Next-run engine, `--tz` / `--next` / `--from`, validation + exit codes |
+| ✅ v0.1 | Translate      | POSIX parser, nicknames, plain-English `describe`, golden tests   |
+| ✅ v0.2 | Timing         | Next-run engine (DST-correct, croniter-verified), `--tz` / `--next` / `--from`, multi-error validation |
 | v0.4    | Safety net     | DST skip/double warnings, Quartz 6–7 field support, `--format json` |
 | v0.6    | Differentiators| Overlap detection, whole-crontab `lint`, SARIF output             |
 | v0.8    | Interop        | Cross-dialect `convert`, `diff`, deterministic `gen` (English → cron) |
