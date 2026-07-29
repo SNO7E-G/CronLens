@@ -42,7 +42,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             archive: zip
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -87,7 +87,7 @@ jobs:
           "ASSET=$staging.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Upload to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: ${{ env.ASSET }}
