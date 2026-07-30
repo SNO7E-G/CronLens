@@ -22,3 +22,4 @@ clap.workspace = true
 anstream.workspace = true
 anstyle.workspace = true
 iana-time-zone.workspace = true
+serde_json.workspace = true

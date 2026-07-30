@@ -9,6 +9,7 @@ use clap::{Parser, ValueEnum};
 use cronlens_core::ast::Dialect;
 use cronlens_core::describe::DescribeOptions;
 use cronlens_core::parser::ParseOptions;
+use cronlens_core::{CronExpr, DstWarning, DstWarningKind, Run, RunKind, Tz};
 
 mod clock;
 mod render;
@@ -69,9 +70,20 @@ struct Cli {
     #[arg(long, value_name = "DATETIME")]
     from: Option<String>,
 
+    /// Output format.
+    #[arg(long, value_enum, default_value_t = Format::Text)]
+    format: Format,
+
     /// Force-disable colored output (also honors NO_COLOR).
     #[arg(long, global = true)]
     no_color: bool,
+}
+
+/// Output format for the default command.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum Format {
+    Text,
+    Json,
 }
 
 /// CLI-facing mirror of [`Dialect`] so `core` stays free of a clap dependency.
@@ -111,27 +123,36 @@ fn main() -> ExitCode {
         return ExitCode::from(exit::INVALID);
     };
 
-    match run_translate(expr, &cli) {
-        Ok(()) => ExitCode::from(exit::OK),
-        Err(code) => ExitCode::from(code),
-    }
+    ExitCode::from(run(expr, &cli))
 }
 
-fn run_translate(expr: &str, cli: &Cli) -> Result<(), u8> {
+fn run(expr: &str, cli: &Cli) -> u8 {
     let mut parse_opts = ParseOptions::new();
     parse_opts.dialect = cli.dialect.map(Into::into);
 
     let parsed = match cronlens_core::parse_with(expr, &parse_opts) {
         Ok(parsed) => parsed,
-        // `@reboot` and friends are valid input with no schedule to translate:
-        // print the explanation and exit cleanly rather than as an error.
+        // `@reboot` and friends are valid input with no schedule to translate.
         Err(err @ cronlens_core::CronError::Unschedulable { .. }) => {
-            println!("{err}");
-            return Ok(());
+            if cli.format == Format::Json {
+                print_json(&serde_json::json!({
+                    "expression": expr, "valid": true, "unschedulable": true,
+                    "message": err.to_string(),
+                }));
+            } else {
+                println!("{err}");
+            }
+            return exit::OK;
         }
         Err(err) => {
-            render::print_parse_error(expr, &err);
-            return Err(exit::INVALID);
+            if cli.format == Format::Json {
+                print_json(&serde_json::json!({
+                    "expression": expr, "valid": false, "error": err.to_string(),
+                }));
+            } else {
+                render::print_parse_error(expr, &err);
+            }
+            return exit::INVALID;
         }
     };
 
@@ -140,28 +161,89 @@ fn run_translate(expr: &str, cli: &Cli) -> Result<(), u8> {
         use_24h: cli.use_24h,
         ..DescribeOptions::default()
     };
+    let description = cronlens_core::describe_with(&parsed, &describe_opts);
 
-    let text = cronlens_core::describe_with(&parsed, &describe_opts);
-    println!("{text}");
-
-    if cli.next > 0 {
+    // Runs and DST warnings share the same anchor/zone; compute both when a run
+    // list was requested.
+    let (tz, runs, warnings) = if cli.next > 0 {
         let tz = match clock::resolve_tz(cli.tz.as_deref(), cli.utc) {
             Ok(tz) => tz,
             Err(msg) => {
                 eprintln!("{msg}");
-                return Err(exit::ERROR);
+                return exit::ERROR;
             }
         };
         let anchor = match clock::resolve_anchor(cli.from.as_deref(), tz) {
             Ok(anchor) => anchor,
             Err(msg) => {
                 eprintln!("{msg}");
-                return Err(exit::ERROR);
+                return exit::ERROR;
             }
         };
         let runs = cronlens_core::next_runs(&parsed, anchor, cli.next);
-        render::print_runs(&runs, tz, cli.use_24h, parsed.second.is_some());
+        let warnings = cronlens_core::dst_warnings(&parsed, anchor, cli.next);
+        (Some(tz), runs, warnings)
+    } else {
+        (None, Vec::new(), Vec::new())
+    };
+
+    match cli.format {
+        Format::Json => print_json(&build_json(
+            expr,
+            &parsed,
+            &description,
+            tz,
+            &runs,
+            &warnings,
+        )),
+        Format::Text => {
+            println!("{description}");
+            if let Some(tz) = tz {
+                render::print_runs(&runs, tz, cli.use_24h, parsed.second.is_some());
+                render::print_warnings(&warnings);
+            }
+        }
     }
 
-    Ok(())
+    if warnings.is_empty() {
+        exit::OK
+    } else {
+        exit::WARN
+    }
+}
+
+fn print_json(value: &serde_json::Value) {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(value).expect("json serialization is infallible here")
+    );
+}
+
+fn build_json(
+    expr: &str,
+    parsed: &CronExpr,
+    description: &str,
+    tz: Option<Tz>,
+    runs: &[Run],
+    warnings: &[DstWarning],
+) -> serde_json::Value {
+    serde_json::json!({
+        "expression": expr,
+        "valid": true,
+        "dialect": parsed.dialect.label(),
+        "description": description,
+        "timezone": tz.map(|t| t.name()),
+        "runs": runs.iter().map(|r| serde_json::json!({
+            "local": r.local().map(|l| l.to_rfc3339()),
+            "utc": r.utc().map(|u| u.to_rfc3339()),
+            "ambiguous": matches!(r.kind, RunKind::Ambiguous { .. }),
+        })).collect::<Vec<_>>(),
+        "warnings": warnings.iter().map(|w| serde_json::json!({
+            "wall": w.wall.format("%Y-%m-%dT%H:%M:%S").to_string(),
+            "kind": match w.kind {
+                DstWarningKind::Skipped => "skipped",
+                DstWarningKind::Doubled => "doubled",
+            },
+        })).collect::<Vec<_>>(),
+    })
 }

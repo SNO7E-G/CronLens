@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-31
+
+The safety net: **warn before DST silently breaks a job.**
+
+### Added
+
+- **DST warnings.** The run list now flags upcoming daylight-saving hazards:
+  a spring-forward time that does not exist (the run is *skipped*) and a
+  fall-back time that occurs twice (the run may fire *twice*). When any warning
+  is present the command exits `1`, so it gates in CI.
+- **`--format json`** on the default command: a machine-readable object with the
+  description, dialect, timezone, runs (local + UTC + ambiguity), and warnings —
+  and `{ "valid": false, "error": … }` on invalid input.
+
+### Deferred
+
+- Quartz `L` / `W` / `#` day extensions and `--dst-policy vixie|utc|both` — the
+  engine already classifies every run, so both layer on additively later.
+
+[0.3.0]: https://github.com/SNO7E-G/CronLens/releases/tag/v0.3.0
+
 ## [0.2.0] - 2026-07-22
 
 Timing: **when will it actually run?**

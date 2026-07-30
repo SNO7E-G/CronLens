@@ -3,12 +3,35 @@
 
 use anstyle::{AnsiColor, Color, Style};
 use cronlens_core::error::CronError;
-use cronlens_core::{Run, RunKind, Tz};
+use cronlens_core::{DstWarning, DstWarningKind, Run, RunKind, Tz};
 
 const RED: Style = Style::new()
     .fg_color(Some(Color::Ansi(AnsiColor::Red)))
     .bold();
+const YELLOW: Style = Style::new()
+    .fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
+    .bold();
 const DIM: Style = Style::new().dimmed();
+
+/// Print DST warnings (spring-forward skips, fall-back doubles). Colored via
+/// `anstream`, so it degrades cleanly when piped or under `NO_COLOR`.
+pub fn print_warnings(warnings: &[DstWarning]) {
+    if warnings.is_empty() {
+        return;
+    }
+    println!();
+    for w in warnings {
+        let wall = w.wall.format("%Y-%m-%d %H:%M");
+        match w.kind {
+            DstWarningKind::Skipped => anstream::println!(
+                "{YELLOW}⚠{YELLOW:#} {wall} does not exist (spring-forward) — this run will be SKIPPED."
+            ),
+            DstWarningKind::Doubled => anstream::println!(
+                "{YELLOW}⚠{YELLOW:#} {wall} occurs twice (fall-back) — this run may fire TWICE."
+            ),
+        }
+    }
+}
 
 /// Print a parse error to stderr, underlining the offending token when the
 /// error carries a span. Routed through `anstream`, so color is stripped

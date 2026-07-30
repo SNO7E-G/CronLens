@@ -98,11 +98,22 @@ Next 4 runs (America/New_York):
 ```
 
 ```console
-cronlens --verbose "0 0 1 * *"           # field-by-field breakdown
-cronlens "*/15 * * * *" --utc            # runs in UTC
-cronlens "0 3 * * *" --from 2026-03-01   # anchor the run list at a date
-cronlens --dialect quartz "0 0 12 * * ?" # pin a dialect
-cronlens "0 9 * * 1-5" --next 0          # translation only, no run list
+cronlens --verbose "0 0 1 * *"                # field-by-field breakdown
+cronlens "*/15 * * * *" --utc                 # runs in UTC
+cronlens "0 3 * * *" --from 2026-03-01        # anchor the run list at a date
+cronlens "30 2 * * *" --tz America/New_York   # ⚠ warns about the DST-skipped run
+cronlens "0 9 * * 1-5" --format json          # machine-readable output for CI
+cronlens --dialect quartz "0 0 12 * * ?"      # pin a dialect
+cronlens "0 9 * * 1-5" --next 0               # translation only, no run list
+```
+
+When a run in the window falls in a spring-forward gap or a fall-back overlap,
+`cronlens` says so and exits `1`:
+
+```console
+$ cronlens "30 2 * * *" --tz America/New_York --from 2027-03-12 --next 5
+...
+⚠ 2027-03-14 02:30 does not exist (spring-forward) — this run will be SKIPPED.
 ```
 
 Timezone/DST math is correct across transitions, and invalid input is reported
@@ -117,7 +128,8 @@ cronlens ships in small, well-tested increments. Each phase is a release.
 | ------- | -------------- | ----------------------------------------------------------------- |
 | ✅ v0.1 | Translate      | POSIX parser, nicknames, plain-English `describe`, golden tests   |
 | ✅ v0.2 | Timing         | Next-run engine (DST-correct, croniter-verified), `--tz` / `--next` / `--from`, multi-error validation |
-| v0.4    | Safety net     | DST skip/double warnings, Quartz 6–7 field support, `--format json` |
+| ✅ v0.3 | Safety net     | DST skip/double warnings, `--format json`, CI exit codes         |
+| v0.4    | Quartz         | Quartz `L` / `W` / `#` day extensions, `--dst-policy`             |
 | v0.6    | Differentiators| Overlap detection, whole-crontab `lint`, SARIF output             |
 | v0.8    | Interop        | Cross-dialect `convert`, `diff`, deterministic `gen` (English → cron) |
 | v1.0    | Polish & reach | `--calendar` heatmap, `.ics` export, WASM playground, distribution |

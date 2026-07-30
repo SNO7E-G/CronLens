@@ -28,6 +28,7 @@ pub mod error;
 pub mod parser;
 pub mod schedule;
 
+pub use analyze::{dst_warnings, DstWarning, DstWarningKind};
 pub use ast::{CronExpr, Dialect, Field, FieldKind, Term};
 pub use describe::{describe, describe_with, DescribeOptions};
 pub use error::{CronError, FieldError, Result};
