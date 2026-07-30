@@ -20,7 +20,7 @@ thiserror = "2"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 chrono-tz = "0.10"
 clap = { version = "4", features = ["derive", "wrap_help"] }
-anstream = "0.6"
+anstream = "1.0"
 anstyle = "1"
 insta = { version = "1", features = ["yaml"] }
 serde = { version = "1", features = ["derive"] }
