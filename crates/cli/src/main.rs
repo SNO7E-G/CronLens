@@ -9,7 +9,7 @@ use clap::{Parser, ValueEnum};
 use cronlens_core::ast::Dialect;
 use cronlens_core::describe::DescribeOptions;
 use cronlens_core::parser::ParseOptions;
-use cronlens_core::{CronExpr, DstWarning, DstWarningKind, Run, RunKind, Tz};
+use cronlens_core::{CronExpr, DstWarning, DstWarningKind, Run, RunIterator, RunKind, Tz};
 
 mod clock;
 mod render;
@@ -70,6 +70,11 @@ struct Cli {
     #[arg(long, value_name = "DATETIME")]
     from: Option<String>,
 
+    /// Compare the expression against another one (before → after), for
+    /// reviewing a schedule change.
+    #[arg(long, value_name = "EXPR")]
+    diff: Option<String>,
+
     /// Output format.
     #[arg(long, value_enum, default_value_t = Format::Text)]
     format: Format,
@@ -129,6 +134,10 @@ fn main() -> ExitCode {
 fn run(expr: &str, cli: &Cli) -> u8 {
     let mut parse_opts = ParseOptions::new();
     parse_opts.dialect = cli.dialect.map(Into::into);
+
+    if let Some(other) = cli.diff.as_deref() {
+        return run_diff(expr, other, cli, &parse_opts);
+    }
 
     let parsed = match cronlens_core::parse_with(expr, &parse_opts) {
         Ok(parsed) => parsed,
@@ -202,6 +211,9 @@ fn run(expr: &str, cli: &Cli) -> u8 {
                 render::print_runs(&runs, tz, cli.use_24h, parsed.second.is_some());
                 render::print_warnings(&warnings);
             }
+            if parsed.day_fields_are_or() {
+                render::print_or_trap_note();
+            }
         }
     }
 
@@ -210,6 +222,61 @@ fn run(expr: &str, cli: &Cli) -> u8 {
     } else {
         exit::WARN
     }
+}
+
+/// Compare two expressions: their English, and how often each fires per year.
+fn run_diff(before_expr: &str, after_expr: &str, cli: &Cli, opts: &ParseOptions) -> u8 {
+    let before = match cronlens_core::parse_with(before_expr, opts) {
+        Ok(p) => p,
+        Err(err) => {
+            render::print_parse_error(before_expr, &err);
+            return exit::INVALID;
+        }
+    };
+    let after = match cronlens_core::parse_with(after_expr, opts) {
+        Ok(p) => p,
+        Err(err) => {
+            render::print_parse_error(after_expr, &err);
+            return exit::INVALID;
+        }
+    };
+
+    let tz = match clock::resolve_tz(cli.tz.as_deref(), cli.utc) {
+        Ok(tz) => tz,
+        Err(msg) => {
+            eprintln!("{msg}");
+            return exit::ERROR;
+        }
+    };
+    let dopts = DescribeOptions {
+        use_24h: cli.use_24h,
+        ..DescribeOptions::default()
+    };
+
+    println!("Before: {}", cronlens_core::describe_with(&before, &dopts));
+    println!("After:  {}", cronlens_core::describe_with(&after, &dopts));
+
+    let n = runs_per_year(&before, tz);
+    let m = runs_per_year(&after, tz);
+    let delta = m as i64 - n as i64;
+    let delta = match delta {
+        0 => "no change".to_string(),
+        d if d > 0 => format!("+{d}"),
+        d => d.to_string(),
+    };
+    println!("Δ Before fires {n} times/year; after fires {m} ({delta}).");
+    exit::OK
+}
+
+/// Count firing runs within the next 365 days from now, in `tz`.
+fn runs_per_year(expr: &CronExpr, tz: Tz) -> usize {
+    use cronlens_core::chrono::{Duration, Utc};
+    let now = Utc::now().with_timezone(&tz);
+    let bound = now.naive_local() + Duration::days(365);
+    RunIterator::new(expr, now)
+        .take_while(|r| r.wall < bound)
+        .filter(Run::fires)
+        .count()
 }
 
 fn print_json(value: &serde_json::Value) {
@@ -232,6 +299,7 @@ fn build_json(
         "valid": true,
         "dialect": parsed.dialect.label(),
         "description": description,
+        "or_trap": parsed.day_fields_are_or(),
         "timezone": tz.map(|t| t.name()),
         "runs": runs.iter().map(|r| serde_json::json!({
             "local": r.local().map(|l| l.to_rfc3339()),

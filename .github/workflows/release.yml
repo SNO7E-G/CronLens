@@ -86,6 +86,19 @@ jobs:
           Compress-Archive -Path $staging -DestinationPath "$staging.zip"
           "ASSET=$staging.zip" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Extract release notes from CHANGELOG
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME:-${{ github.event.inputs.tag }}}"
+          version="${tag#v}"
+          awk -v ver="$version" '
+            $0 ~ ("^## \\[" ver "\\]") {found=1; next}
+            found && /^## \[/ {exit}
+            found {print}
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          # Fall back to auto notes if the section is empty.
+          [ -s RELEASE_NOTES.md ] || echo "See CHANGELOG.md." > RELEASE_NOTES.md
+
       - name: Upload to release
         uses: softprops/action-gh-release@v3
         with:
@@ -93,4 +106,4 @@ jobs:
           files: ${{ env.ASSET }}
           draft: false
           fail_on_unmatched_files: true
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md

@@ -478,17 +478,11 @@ fn build_sentence(expr: &CronExpr, options: &DescribeOptions) -> String {
         .filter(|f| f.is_restricted())
         .map(year_clause);
 
-    // The OR-trap: when both day fields are restricted, a date matches either
-    // one, so join them with an explicit "and" rather than folding them in as
-    // independent clauses.
-    let day_segment = if expr.day_fields_are_or() {
-        Some(format!(
-            "{}, and {}",
-            dom.as_deref().unwrap_or_default(),
-            dow.as_deref().unwrap_or_default()
-        ))
-    } else {
-        dom.clone().or_else(|| dow.clone())
+    // Whenever both day fields carry a clause (the OR-trap, or a star-prefixed
+    // `*/n` AND-ed with the other field), join them — never drop one.
+    let day_segment = match (dom, dow) {
+        (Some(d), Some(w)) => Some(format!("{d}, and {w}")),
+        (day, None) | (None, day) => day,
     };
 
     let mut parts = vec![time];
@@ -948,6 +942,31 @@ mod tests {
         assert_eq!(
             describe(&expr),
             "At 12:00 AM, on day 1 of the month, and only on Monday."
+        );
+    }
+
+    #[test]
+    fn star_prefixed_dom_step_keeps_the_dow_clause() {
+        // `*/2` in day-of-month is star-prefixed (AND semantics), but it still
+        // constrains — the day-of-week clause must not be dropped.
+        let expr = expr5(
+            f(FieldKind::Minute, vec![Term::Single(0)], "0"),
+            f(FieldKind::Hour, vec![Term::Single(0)], "0"),
+            f(
+                FieldKind::DayOfMonth,
+                vec![Term::Step {
+                    base: StepBase::Whole,
+                    step: 2,
+                }],
+                "*/2",
+            ),
+            wildcard(FieldKind::Month),
+            f(FieldKind::DayOfWeek, vec![Term::Single(1)], "1"),
+            "0 0 */2 * 1",
+        );
+        assert_eq!(
+            describe(&expr),
+            "At 12:00 AM, on every 2nd day of the month, and only on Monday."
         );
     }
 

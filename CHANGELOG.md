@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-31
+
+Reviewing schedule changes, and the gotcha nobody knows.
+
+### Added
+
+- **`--diff <expr>`** compares the expression against another one for PR review:
+  the before/after plain English plus how often each fires per year, e.g.
+  *"Before fires 261 times/year; after fires 365 (+104)."*
+- **Day-of-month / day-of-week OR-trap detector.** When both day fields are set,
+  cron fires when *either* matches — not both. cronlens now flags this classic
+  surprise under the run list, and reports it as `"or_trap": true` in JSON.
+
+### Fixed
+
+- The describer no longer drops the day-of-week clause when day-of-month is a
+  star-prefixed step like `*/2` (e.g. `0 0 */2 * 1` now reads "…on every 2nd day
+  of the month, and only on Monday").
+
+### Changed
+
+- GitHub release notes are now generated from this changelog's matching section
+  instead of an auto-generated commit list.
+
+### Deferred
+
+- Quartz `L` / `W` / `#` day extensions and `--dst-policy vixie|utc|both`.
+
+[0.4.0]: https://github.com/SNO7E-G/CronLens/releases/tag/v0.4.0
+
 ## [0.3.0] - 2026-07-31
 
 The safety net: **warn before DST silently breaks a job.**

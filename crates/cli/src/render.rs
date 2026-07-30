@@ -11,7 +11,18 @@ const RED: Style = Style::new()
 const YELLOW: Style = Style::new()
     .fg_color(Some(Color::Ansi(AnsiColor::Yellow)))
     .bold();
+const CYAN: Style = Style::new()
+    .fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
+    .bold();
 const DIM: Style = Style::new().dimmed();
+
+/// Note the day-of-month / day-of-week OR-trap: the classic surprise where
+/// setting both day fields fires on *either*, not both.
+pub fn print_or_trap_note() {
+    anstream::println!(
+        "\n{CYAN}ⓘ note{CYAN:#} both day-of-month and day-of-week are set — this fires when EITHER matches (day-of-month OR day-of-week), which surprises most people."
+    );
+}
 
 /// Print DST warnings (spring-forward skips, fall-back doubles). Colored via
 /// `anstream`, so it degrades cleanly when piped or under `NO_COLOR`.

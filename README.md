@@ -103,6 +103,7 @@ cronlens "*/15 * * * *" --utc                 # runs in UTC
 cronlens "0 3 * * *" --from 2026-03-01        # anchor the run list at a date
 cronlens "30 2 * * *" --tz America/New_York   # ⚠ warns about the DST-skipped run
 cronlens "0 9 * * 1-5" --format json          # machine-readable output for CI
+cronlens "0 9 * * 1-5" --diff "0 9 * * *"     # compare a schedule change
 cronlens --dialect quartz "0 0 12 * * ?"      # pin a dialect
 cronlens "0 9 * * 1-5" --next 0               # translation only, no run list
 ```
@@ -129,7 +130,8 @@ cronlens ships in small, well-tested increments. Each phase is a release.
 | ✅ v0.1 | Translate      | POSIX parser, nicknames, plain-English `describe`, golden tests   |
 | ✅ v0.2 | Timing         | Next-run engine (DST-correct, croniter-verified), `--tz` / `--next` / `--from`, multi-error validation |
 | ✅ v0.3 | Safety net     | DST skip/double warnings, `--format json`, CI exit codes         |
-| v0.4    | Quartz         | Quartz `L` / `W` / `#` day extensions, `--dst-policy`             |
+| ✅ v0.4 | Review         | `--diff` (before/after + runs/year), day-field OR-trap detector  |
+| v0.5    | Quartz         | Quartz `L` / `W` / `#` day extensions, `--dst-policy`            |
 | v0.6    | Differentiators| Overlap detection, whole-crontab `lint`, SARIF output             |
 | v0.8    | Interop        | Cross-dialect `convert`, `diff`, deterministic `gen` (English → cron) |
 | v1.0    | Polish & reach | `--calendar` heatmap, `.ics` export, WASM playground, distribution |
